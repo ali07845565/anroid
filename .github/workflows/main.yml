@@ -5,41 +5,43 @@ on:
 
 jobs:
   android-remote:
-    runs-on: macos-latest          # macOS best for Android emulator speed
-    timeout-minutes: 360           # 6 hours max, cancel kar sakte ho
+    runs-on: macos-latest
+    timeout-minutes: 360
 
     steps:
-      - name: Enable KVM if Linux (skip for macOS)
-        if: runner.os == 'Linux'
+      - name: Setup Environment
         run: |
-          sudo modprobe kvm
-          sudo chown $USER /dev/kvm
+          brew install android-commandlinetools
+          echo 'export ANDROID_HOME=$HOME/Library/Android/sdk' >> $GITHUB_ENV
+          echo 'export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools' >> $GITHUB_ENV
 
-      - name: Setup Android SDK & Emulator
-        uses: hannesa2/action-android/emulator-run-cmd@v1
-        with:
-          api: 34                       # Android 14
-          abi: x86_64                   # fastest on macOS
-          cmd: emulator -avd test -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect
-
-      - name: Wait for Emulator to Boot
+      - name: Install Android SDK Components
         run: |
-          adb wait-for-device
-          adb shell input keyevent 82 &  # unlock if needed
+          sdkmanager "platform-tools" "platforms;android-34" "system-images;android-34;google_apis;x86_64" "emulator"
+          sdkmanager --licenses | grep -v "WARNING"
+
+      - name: Create AVD
+        run: |
+          avdmanager create avd -n test_avd -k "system-images;android-34;google_apis;x86_64" -d pixel --force
+
+      - name: Launch Emulator
+        run: |
+          nohup emulator -avd test_avd -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect &
           sleep 30
-          adb devices
+          adb wait-for-device
+          echo "Emulator ready!"
 
-      - name: Install scrcpy (on runner)
+      - name: Install scrcpy
         run: |
           brew install scrcpy
-          # ya manual download if brew nahi chalta
+          echo "scrcpy installed"
 
-      - name: Start scrcpy server on emulator (TCP mode)
+      - name: Setup scrcpy Server
         run: |
-          # scrcpy ko TCP par emulator ke saath connect karne ke liye
           adb reverse tcp:27183 tcp:27183
           scrcpy --tcpip --no-display --stay-awake --turn-screen-off --power-off-on-close &
-          echo "scrcpy server started on port 27183"
+          echo "scrcpy server running on port 27183"
+          sleep 5
 
       - name: Install Tailscale
         run: |
@@ -52,39 +54,44 @@ jobs:
           TS_AUTHKEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
         run: |
           if [ -z "$TS_AUTHKEY" ]; then
-            echo "Add TAILSCALE_AUTH_KEY in repo secrets!"
+            echo "❌ Error: TAILSCALE_AUTH_KEY secret missing!"
+            echo "Settings → Secrets and variables → Actions → Add TAILSCALE_AUTH_KEY"
             exit 1
           fi
           
-          sudo tailscale up --authkey=$TS_AUTHKEY --accept-routes --hostname="android-emulator-${{ github.run_id }}"
+          sudo tailscale up --authkey=$TS_AUTHKEY --accept-routes --hostname="android-emulator-${{ github.run_id }}" --reset
           
           TS_IP=$(tailscale ip -4)
+          echo "✅ Tailscale IP: $TS_IP"
           echo "TAILSCALE_IP=$TS_IP" >> $GITHUB_ENV
           
-          echo "Waiting for Tailscale..."
-          sleep 15
+          sleep 10
 
-      - name: Show Access Info
+      - name: Show Access Instructions
         run: |
           echo ""
-          echo "====================================="
-          echo " Android Emulator Remote Access"
-          echo "====================================="
-          echo "Tailscale IP : ${{ env.TAILSCALE_IP }}"
-          echo "scrcpy Port  : 27183"
+          echo "🎮 ANDROID EMULATOR READY FOR REMOTE ACCESS 🎮"
+          echo "============================================================="
+          echo "📍 Tailscale IP: ${{ env.TAILSCALE_IP }}"
+          echo "🔌 scrcpy Port: 27183"
+          echo "============================================================="
           echo ""
-          echo "On your local PC/phone:"
-          echo "1. Tailscale join karo (same network)"
-          echo "2. scrcpy --tcpip=${{ env.TAILSCALE_IP }}:27183"
-          echo "   (ya scrcpy app use karo)"
+          echo "📱 APNE LOCAL DEVICE PAR YE STEPS FOLLOW KARO:"
+          echo "1. Tailscale install karo[](https://tailscale.com)"
+          echo "2. Same Tailscale account se login karo"
+          echo "3. scrcpy install karo[](https://github.com/Genymobile/scrcpy)"
           echo ""
-          echo "Username/Password ki zaroorat nahi - direct control"
-          echo "====================================="
+          echo "💻 COMMAND RUN KARO:"
+          echo "scrcpy --tcpip=${{ env.TAILSCALE_IP }}:27183"
+          echo ""
+          echo "✅ Ab Android emulator ko mouse/keyboard se control kar sakte ho!"
+          echo "⚠️  Workflow ko manually cancel karo jab kaam khatam ho"
+          echo "============================================================="
 
-      - name: Keep Alive (cancel workflow jab khatam karna ho)
+      - name: Keep Session Active
         run: |
-          echo "Emulator running... Manually cancel the workflow when done."
+          echo "Emulator active... Workflow cancel karo jab khatam karna ho"
           while true; do
-            echo "$(date) - Still active"
+            echo "$(date) - Still running..."
             sleep 300
           done
