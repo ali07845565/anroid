@@ -1,4 +1,4 @@
-name: TITAN-V175-NO-ERROR-EDITION
+name: TITAN-V179-MULTI-VIDEO
 
 on:
   workflow_dispatch:
@@ -7,7 +7,7 @@ jobs:
   build:
     runs-on: windows-latest
     steps:
-      - name: 1. Fix User & Services
+      - name: 1. User & System Optimization
         shell: powershell
         run: |
           $Password = ConvertTo-SecureString "Admin@Watch786" -AsPlainText -Force
@@ -15,64 +15,80 @@ jobs:
               New-LocalUser -Name "RDP" -Password $Password -AccountNeverExpires
               Add-LocalGroupMember -Group "Administrators" -Member "RDP"
           }
-          # Disabling heavy background tasks to save CPU
           Stop-Service -Name wuauserv, SysMain, AudioEndpointBuilder, audiosrv -Force
-
-      - name: 2. Modern Virtual RAM Fix (No WMIC)
-        shell: powershell
-        run: |
-          # Memory management optimization
-          $pagefile = Get-CimInstance Win32_PageFileSetting
           Set-CimInstance -Query "Select * from Win32_PageFileSetting" -Property @{InitialSize = 32768; MaximumSize = 65536} -ErrorAction SilentlyContinue
           pip install pyautogui psutil --quiet
+          winget install --id Mozilla.Firefox -e --silent --accept-source-agreements
 
-      - name: 3. Tailscale Link (Login Here)
+      - name: 2. Tailscale Login
         shell: powershell
         run: |
           $tsUrl = "https://pkgs.tailscale.com/stable/tailscale-setup-1.82.0-amd64.msi"
           Invoke-WebRequest -Uri $tsUrl -OutFile "ts.msi"
           Start-Process msiexec.exe -ArgumentList "/i", "ts.msi", "/quiet", "/norestart" -Wait
           Write-Host "`n******************************************************"
-          Write-Host ">>> OPEN THIS LINK: <<<"
+          Write-Host ">>> TAILSCALE LOGIN LINK NEECHAY HAI <<<" -ForegroundColor Yellow
           & "$env:ProgramFiles\Tailscale\tailscale.exe" up --accept-dns=false --force-reauth
           Write-Host "******************************************************`n"
           Start-Sleep -Seconds 120
 
-      - name: 4. Deploy Anti-Crash Watcher
+      - name: 3. Deploy 15-Tabs Multi-Video Script
         run: |
           $script = @"
-          import os, time, subprocess, threading, pyautogui, random, psutil
-          def human_bot():
+          import os, time, subprocess, threading, pyautogui, random
+
+          # --- AAPKI VIDEO LIST ---
+          VIDEO_LINKS = [
+              "https://youtu.be/oiyYa3IL2Rc?si=LnzHB2SnxLvotRp-",
+              "https://youtu.be/OXuTuHQqB7s?si=hsLjg-WN4Kddl2en",
+              "https://youtu.be/K9ihEWJn4Go?si=VMP02dzeGwZtH_G0",
+              "https://youtu.be/z25lo2mogbk?si=RDQn25eKVGl6u8Dy",
+              "https://youtu.be/ZkJlQ_q7x5Q?si=5vafU9AuYNTZcp5E"
+          ]
+
+          def anti_sleep():
               while True:
-                  # Randomly move mouse and press keys to fool GitHub/YT
-                  time.sleep(random.randint(20, 55))
-                  pyautogui.press('f15') # Invisible key
+                  time.sleep(random.randint(20, 50))
+                  pyautogui.press('f15')
                   pyautogui.moveRel(random.randint(-1, 1), 0)
 
           def launch():
+              print("------------------------------------------------")
+              print("TITAN MULTI-VIDEO MODE ACTIVE")
+              print(f"Total Videos: {len(VIDEO_LINKS)}")
+              print("Launching 15 Tabs (3 tabs per video)...")
+              print("------------------------------------------------")
+              
               ff = r'C:\Program Files\Mozilla Firefox\firefox.exe'
-              for i in range(35): # 35 is safer than 40 for stability
-                  p = f'C:\\Users\\Public\\T_{i}'
-                  if not os.path.exists(p): os.makedirs(p)
-                  # Internal Firefox Hardening
-                  with open(os.path.join(p, "prefs.js"), "w") as f:
-                      f.write('user_pref("network.proxy.type", 1);\n')
-                      f.write('user_pref("network.proxy.http", "45.152.188.238");\n')
-                      f.write('user_pref("network.proxy.http_port", 3128);\n')
-                      f.write('user_pref("network.proxy.ssl", "45.152.188.238");\n')
-                      f.write('user_pref("network.proxy.ssl_port", 3128);\n')
-                      f.write('user_pref("media.volume_scale", "0.0");\n')
-                      f.write('user_pref("browser.tabs.remote.autostart", false);\n') # Saves RAM
-                  
-                  subprocess.Popen([ff, "-new-instance", "-profile", p, "-no-remote", "http://googleusercontent.com/youtube.com/watch?v=YOUR_VIDEO_ID"])
-                  time.sleep(12)
+              
+              tab_count = 0
+              for link in VIDEO_LINKS:
+                  for repeat in range(3): # Har video 3 baar khulay gi
+                      tab_count += 1
+                      p = f'C:\\Users\\Public\\Profile_{tab_count}'
+                      if not os.path.exists(p): os.makedirs(p)
+                      
+                      # Settings: Russian Proxy, Mute, No Images
+                      with open(os.path.join(p, "prefs.js"), "w") as f:
+                          f.write('user_pref("network.proxy.type", 1);\n')
+                          f.write('user_pref("network.proxy.http", "45.152.188.238");\n')
+                          f.write('user_pref("network.proxy.http_port", 3128);\n')
+                          f.write('user_pref("network.proxy.ssl", "45.152.188.238");\n')
+                          f.write('user_pref("network.proxy.ssl_port", 3128);\n')
+                          f.write('user_pref("media.volume_scale", "0.0");\n')
+                          f.write('user_pref("permissions.default.image", 2);\n')
+                          f.write('user_pref("browser.sessionstore.resume_from_crash", false);\n')
+
+                      subprocess.Popen([ff, "-new-instance", "-profile", p, "-no-remote", link])
+                      print(f"Tab {tab_count}: Playing Video {link}")
+                      time.sleep(12)
 
           if __name__ == "__main__":
-              threading.Thread(target=human_bot, daemon=True).start()
+              threading.Thread(target=anti_sleep, daemon=True).start()
               launch()
           "@
-          $script | Out-File -FilePath "C:\Users\Public\Desktop\TITAN_FINAL.py" -Encoding ascii
-          "@echo off`npython C:\Users\Public\Desktop\TITAN_FINAL.py`npause" | Out-File -FilePath "C:\Users\Public\Desktop\START.bat" -Encoding ascii
+          $script | Out-File -FilePath "C:\Users\Public\Desktop\TITAN_MULTI.py" -Encoding ascii
+          "@echo off`ntitle TITAN MULTI-WATCH`npython C:\Users\Public\Desktop\TITAN_MULTI.py`npause" | Out-File -FilePath "C:\Users\Public\Desktop\START.bat" -Encoding ascii
 
-      - name: 5. Keep-Alive (9 Hours)
+      - name: 4. Keep-Alive
         run: Start-Sleep -Seconds 32400
