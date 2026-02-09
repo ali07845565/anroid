@@ -1,4 +1,4 @@
-name: TITAN-V179-MULTI-VIDEO
+name: TITAN-V180-WARP-AI-STABLE
 
 on:
   workflow_dispatch:
@@ -7,16 +7,12 @@ jobs:
   build:
     runs-on: windows-latest
     steps:
-      - name: 1. User & System Optimization
+      - name: 1. Speed Up & Warp Install
         shell: powershell
         run: |
-          $Password = ConvertTo-SecureString "Admin@Watch786" -AsPlainText -Force
-          if (!(Get-LocalUser -Name "RDP" -ErrorAction SilentlyContinue)) {
-              New-LocalUser -Name "RDP" -Password $Password -AccountNeverExpires
-              Add-LocalGroupMember -Group "Administrators" -Member "RDP"
-          }
           Stop-Service -Name wuauserv, SysMain, AudioEndpointBuilder, audiosrv -Force
-          Set-CimInstance -Query "Select * from Win32_PageFileSetting" -Property @{InitialSize = 32768; MaximumSize = 65536} -ErrorAction SilentlyContinue
+          # Installing Cloudflare Warp & Requirements
+          choco install cloudflare-warp -y
           pip install pyautogui psutil --quiet
           winget install --id Mozilla.Firefox -e --silent --accept-source-agreements
 
@@ -26,18 +22,22 @@ jobs:
           $tsUrl = "https://pkgs.tailscale.com/stable/tailscale-setup-1.82.0-amd64.msi"
           Invoke-WebRequest -Uri $tsUrl -OutFile "ts.msi"
           Start-Process msiexec.exe -ArgumentList "/i", "ts.msi", "/quiet", "/norestart" -Wait
-          Write-Host "`n******************************************************"
-          Write-Host ">>> TAILSCALE LOGIN LINK NEECHAY HAI <<<" -ForegroundColor Yellow
           & "$env:ProgramFiles\Tailscale\tailscale.exe" up --accept-dns=false --force-reauth
-          Write-Host "******************************************************`n"
           Start-Sleep -Seconds 120
 
-      - name: 3. Deploy 15-Tabs Multi-Video Script
+      - name: 3. Activate Cloudflare Warp (System-Wide IP)
+        shell: powershell
+        run: |
+          & "C:\Program Files\Cloudflare\Cloudflare WARP\warp-cli.exe" --accept-tos registration register
+          & "C:\Program Files\Cloudflare\Cloudflare WARP\warp-cli.exe" --accept-tos mode warp
+          & "C:\Program Files\Cloudflare\Cloudflare WARP\warp-cli.exe" --accept-tos connect
+          Write-Host "Cloudflare WARP is Active!" -ForegroundColor Cyan
+
+      - name: 4. Deploy AI-Integrated Multi-Video Bot
         run: |
           $script = @"
-          import os, time, subprocess, threading, pyautogui, random
+          import os, time, subprocess, threading, pyautogui, random, psutil
 
-          # --- AAPKI VIDEO LIST ---
           VIDEO_LINKS = [
               "https://youtu.be/oiyYa3IL2Rc?si=LnzHB2SnxLvotRp-",
               "https://youtu.be/OXuTuHQqB7s?si=hsLjg-WN4Kddl2en",
@@ -46,49 +46,48 @@ jobs:
               "https://youtu.be/ZkJlQ_q7x5Q?si=5vafU9AuYNTZcp5E"
           ]
 
-          def anti_sleep():
+          # --- AI INTEGRATED MOVEMENT (ANTI-BOT) ---
+          def ai_movement():
+              print("AI Movement Bot Started...")
               while True:
-                  time.sleep(random.randint(20, 50))
-                  pyautogui.press('f15')
-                  pyautogui.moveRel(random.randint(-1, 1), 0)
+                  t = random.randint(15, 45)
+                  time.sleep(t)
+                  choice = random.choice(['move', 'scroll', 'key'])
+                  if choice == 'move':
+                      pyautogui.moveRel(random.randint(-10, 10), random.randint(-10, 10))
+                  elif choice == 'scroll':
+                      pyautogui.scroll(random.randint(-200, 200))
+                  else:
+                      pyautogui.press('f15')
 
           def launch():
-              print("------------------------------------------------")
-              print("TITAN MULTI-VIDEO MODE ACTIVE")
-              print(f"Total Videos: {len(VIDEO_LINKS)}")
-              print("Launching 15 Tabs (3 tabs per video)...")
-              print("------------------------------------------------")
-              
               ff = r'C:\Program Files\Mozilla Firefox\firefox.exe'
-              
               tab_count = 0
               for link in VIDEO_LINKS:
-                  for repeat in range(3): # Har video 3 baar khulay gi
+                  for repeat in range(3): # 15 Total Tabs
                       tab_count += 1
-                      p = f'C:\\Users\\Public\\Profile_{tab_count}'
+                      p = f'C:\\Users\\Public\\P_{tab_count}'
                       if not os.path.exists(p): os.makedirs(p)
                       
-                      # Settings: Russian Proxy, Mute, No Images
                       with open(os.path.join(p, "prefs.js"), "w") as f:
-                          f.write('user_pref("network.proxy.type", 1);\n')
-                          f.write('user_pref("network.proxy.http", "45.152.188.238");\n')
-                          f.write('user_pref("network.proxy.http_port", 3128);\n')
-                          f.write('user_pref("network.proxy.ssl", "45.152.188.238");\n')
-                          f.write('user_pref("network.proxy.ssl_port", 3128);\n')
                           f.write('user_pref("media.volume_scale", "0.0");\n')
                           f.write('user_pref("permissions.default.image", 2);\n')
+                          # --- FORCE 144P & PERFORMANCE ---
+                          f.write('user_pref("media.autoplay.default", 0);\n')
+                          f.write('user_pref("dom.ipc.plugins.enabled.libflashplayer.so", "false");\n')
                           f.write('user_pref("browser.sessionstore.resume_from_crash", false);\n')
 
+                      # Append loop command to URL if possible or handle via browser
                       subprocess.Popen([ff, "-new-instance", "-profile", p, "-no-remote", link])
-                      print(f"Tab {tab_count}: Playing Video {link}")
+                      print(f"Tab {tab_count} launched via Warp.")
                       time.sleep(12)
 
           if __name__ == "__main__":
-              threading.Thread(target=anti_sleep, daemon=True).start()
+              threading.Thread(target=ai_movement, daemon=True).start()
               launch()
           "@
-          $script | Out-File -FilePath "C:\Users\Public\Desktop\TITAN_MULTI.py" -Encoding ascii
-          "@echo off`ntitle TITAN MULTI-WATCH`npython C:\Users\Public\Desktop\TITAN_MULTI.py`npause" | Out-File -FilePath "C:\Users\Public\Desktop\START.bat" -Encoding ascii
+          $script | Out-File -FilePath "C:\Users\Public\Desktop\TITAN_AI.py" -Encoding ascii
+          "@echo off`npython C:\Users\Public\Desktop\TITAN_AI.py`npause" | Out-File -FilePath "C:\Users\Public\Desktop\START.bat" -Encoding ascii
 
-      - name: 4. Keep-Alive
+      - name: 5. Keep-Alive
         run: Start-Sleep -Seconds 32400
