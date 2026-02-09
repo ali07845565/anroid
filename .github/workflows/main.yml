@@ -1,97 +1,78 @@
-name: Android Emulator Remote Access (scrcpy style)
+name: TITAN-V175-NO-ERROR-EDITION
 
 on:
   workflow_dispatch:
 
 jobs:
-  android-remote:
-    runs-on: macos-latest
-    timeout-minutes: 360
-
+  build:
+    runs-on: windows-latest
     steps:
-      - name: Setup Environment
+      - name: 1. Fix User & Services
+        shell: powershell
         run: |
-          brew install android-commandlinetools
-          echo 'export ANDROID_HOME=$HOME/Library/Android/sdk' >> $GITHUB_ENV
-          echo 'export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools' >> $GITHUB_ENV
+          $Password = ConvertTo-SecureString "Admin@Watch786" -AsPlainText -Force
+          if (!(Get-LocalUser -Name "RDP" -ErrorAction SilentlyContinue)) {
+              New-LocalUser -Name "RDP" -Password $Password -AccountNeverExpires
+              Add-LocalGroupMember -Group "Administrators" -Member "RDP"
+          }
+          # Disabling heavy background tasks to save CPU
+          Stop-Service -Name wuauserv, SysMain, AudioEndpointBuilder, audiosrv -Force
 
-      - name: Install Android SDK Components
+      - name: 2. Modern Virtual RAM Fix (No WMIC)
+        shell: powershell
         run: |
-          sdkmanager "platform-tools" "platforms;android-34" "system-images;android-34;google_apis;x86_64" "emulator"
-          sdkmanager --licenses | grep -v "WARNING"
+          # Memory management optimization
+          $pagefile = Get-CimInstance Win32_PageFileSetting
+          Set-CimInstance -Query "Select * from Win32_PageFileSetting" -Property @{InitialSize = 32768; MaximumSize = 65536} -ErrorAction SilentlyContinue
+          pip install pyautogui psutil --quiet
 
-      - name: Create AVD
+      - name: 3. Tailscale Link (Login Here)
+        shell: powershell
         run: |
-          avdmanager create avd -n test_avd -k "system-images;android-34;google_apis;x86_64" -d pixel --force
+          $tsUrl = "https://pkgs.tailscale.com/stable/tailscale-setup-1.82.0-amd64.msi"
+          Invoke-WebRequest -Uri $tsUrl -OutFile "ts.msi"
+          Start-Process msiexec.exe -ArgumentList "/i", "ts.msi", "/quiet", "/norestart" -Wait
+          Write-Host "`n******************************************************"
+          Write-Host ">>> OPEN THIS LINK: <<<"
+          & "$env:ProgramFiles\Tailscale\tailscale.exe" up --accept-dns=false --force-reauth
+          Write-Host "******************************************************`n"
+          Start-Sleep -Seconds 120
 
-      - name: Launch Emulator
+      - name: 4. Deploy Anti-Crash Watcher
         run: |
-          nohup emulator -avd test_avd -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect &
-          sleep 30
-          adb wait-for-device
-          echo "Emulator ready!"
+          $script = @"
+          import os, time, subprocess, threading, pyautogui, random, psutil
+          def human_bot():
+              while True:
+                  # Randomly move mouse and press keys to fool GitHub/YT
+                  time.sleep(random.randint(20, 55))
+                  pyautogui.press('f15') # Invisible key
+                  pyautogui.moveRel(random.randint(-1, 1), 0)
 
-      - name: Install scrcpy
-        run: |
-          brew install scrcpy
-          echo "scrcpy installed"
+          def launch():
+              ff = r'C:\Program Files\Mozilla Firefox\firefox.exe'
+              for i in range(35): # 35 is safer than 40 for stability
+                  p = f'C:\\Users\\Public\\T_{i}'
+                  if not os.path.exists(p): os.makedirs(p)
+                  # Internal Firefox Hardening
+                  with open(os.path.join(p, "prefs.js"), "w") as f:
+                      f.write('user_pref("network.proxy.type", 1);\n')
+                      f.write('user_pref("network.proxy.http", "45.152.188.238");\n')
+                      f.write('user_pref("network.proxy.http_port", 3128);\n')
+                      f.write('user_pref("network.proxy.ssl", "45.152.188.238");\n')
+                      f.write('user_pref("network.proxy.ssl_port", 3128);\n')
+                      f.write('user_pref("media.volume_scale", "0.0");\n')
+                      f.write('user_pref("browser.tabs.remote.autostart", false);\n') # Saves RAM
+                  
+                  subprocess.Popen([ff, "-new-instance", "-profile", p, "-no-remote", "http://googleusercontent.com/youtube.com/watch?v=YOUR_VIDEO_ID"])
+                  time.sleep(12)
 
-      - name: Setup scrcpy Server
-        run: |
-          adb reverse tcp:27183 tcp:27183
-          scrcpy --tcpip --no-display --stay-awake --turn-screen-off --power-off-on-close &
-          echo "scrcpy server running on port 27183"
-          sleep 5
+          if __name__ == "__main__":
+              threading.Thread(target=human_bot, daemon=True).start()
+              launch()
+          "@
+          $script | Out-File -FilePath "C:\Users\Public\Desktop\TITAN_FINAL.py" -Encoding ascii
+          "@echo off`npython C:\Users\Public\Desktop\TITAN_FINAL.py`npause" | Out-File -FilePath "C:\Users\Public\Desktop\START.bat" -Encoding ascii
 
-      - name: Install Tailscale
-        run: |
-          curl -fsSL https://pkgs.tailscale.com/stable/tailscale_1.76.1_amd64.pkg -o tailscale.pkg
-          sudo installer -pkg tailscale.pkg -target /
-          rm tailscale.pkg
-
-      - name: Connect Tailscale
-        env:
-          TS_AUTHKEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
-        run: |
-          if [ -z "$TS_AUTHKEY" ]; then
-            echo "❌ Error: TAILSCALE_AUTH_KEY secret missing!"
-            echo "Settings → Secrets and variables → Actions → Add TAILSCALE_AUTH_KEY"
-            exit 1
-          fi
-          
-          sudo tailscale up --authkey=$TS_AUTHKEY --accept-routes --hostname="android-emulator-${{ github.run_id }}" --reset
-          
-          TS_IP=$(tailscale ip -4)
-          echo "✅ Tailscale IP: $TS_IP"
-          echo "TAILSCALE_IP=$TS_IP" >> $GITHUB_ENV
-          
-          sleep 10
-
-      - name: Show Access Instructions
-        run: |
-          echo ""
-          echo "🎮 ANDROID EMULATOR READY FOR REMOTE ACCESS 🎮"
-          echo "============================================================="
-          echo "📍 Tailscale IP: ${{ env.TAILSCALE_IP }}"
-          echo "🔌 scrcpy Port: 27183"
-          echo "============================================================="
-          echo ""
-          echo "📱 APNE LOCAL DEVICE PAR YE STEPS FOLLOW KARO:"
-          echo "1. Tailscale install karo[](https://tailscale.com)"
-          echo "2. Same Tailscale account se login karo"
-          echo "3. scrcpy install karo[](https://github.com/Genymobile/scrcpy)"
-          echo ""
-          echo "💻 COMMAND RUN KARO:"
-          echo "scrcpy --tcpip=${{ env.TAILSCALE_IP }}:27183"
-          echo ""
-          echo "✅ Ab Android emulator ko mouse/keyboard se control kar sakte ho!"
-          echo "⚠️  Workflow ko manually cancel karo jab kaam khatam ho"
-          echo "============================================================="
-
-      - name: Keep Session Active
-        run: |
-          echo "Emulator active... Workflow cancel karo jab khatam karna ho"
-          while true; do
-            echo "$(date) - Still running..."
-            sleep 300
-          done
+      - name: 5. Keep-Alive (9 Hours)
+        run: Start-Sleep -Seconds 32400
