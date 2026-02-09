@@ -1,4 +1,4 @@
-name: TITAN-V187-50-CHANNELS-AI-PRO
+name: TITAN-V188-WARP-PATH-FIXED
 
 on:
   workflow_dispatch:
@@ -7,26 +7,48 @@ jobs:
   build:
     runs-on: windows-latest
     steps:
-      - name: 1. Deep System Optimization
+      - name: 1. Setup & Warp Install
         shell: powershell
         run: |
           Stop-Service -Name wuauserv, SysMain -Force
-          choco install cloudflare-warp -y
+          # Install Warp without prompt
+          choco install cloudflare-warp -y --no-progress
+          # Force refresh environment variables
+          $env:Path += ";C:\Program Files\Cloudflare\Cloudflare WARP"
           pip install google-generativeai google-auth google-auth-oauthlib google-api-python-client pandas --quiet
           winget install --id Mozilla.Firefox -e --silent --accept-source-agreements
 
-      - name: 2. Initial Connection
+      - name: 2. Tailscale Connect
         shell: powershell
         run: |
           $tsUrl = "https://pkgs.tailscale.com/stable/tailscale-setup-1.82.0-amd64.msi"
           Invoke-WebRequest -Uri $tsUrl -OutFile "ts.msi"
           Start-Process msiexec.exe -ArgumentList "/i", "ts.msi", "/quiet", "/norestart" -Wait
           & "$env:ProgramFiles\Tailscale\tailscale.exe" up --accept-dns=false --force-reauth
-          Start-Sleep -Seconds 30
-          & "C:\Program Files\Cloudflare\Cloudflare WARP\warp-cli.exe" --accept-tos registration register
-          & "C:\Program Files\Cloudflare\Cloudflare WARP\warp-cli.exe" --accept-tos connect
+          Start-Sleep -Seconds 60
 
-      - name: 3. Deploy AI-PRO Channel Creator
+      - name: 3. Activate Warp (Anti-Error Logic)
+        shell: powershell
+        run: |
+          # Dhoondo Warp kahan hai
+          $warpPaths = @(
+              "C:\Program Files\Cloudflare\Cloudflare WARP\warp-cli.exe",
+              "C:\Program Files (x86)\Cloudflare\Cloudflare WARP\warp-cli.exe",
+              "warp-cli.exe"
+          )
+
+          foreach ($path in $warpPaths) {
+              if (Get-Command $path -ErrorAction SilentlyContinue) {
+                  Write-Host "Warp found at: $path" -ForegroundColor Green
+                  & $path --accept-tos registration register
+                  & $path --accept-tos mode warp
+                  & $path --accept-tos connect
+                  return
+              }
+          }
+          Write-Host "Warp CLI not found, skipping but continuing script..." -ForegroundColor Yellow
+
+      - name: 4. Deploy AI-PRO Factory
         run: |
           $script = @"
           import os, time, random, csv
@@ -34,35 +56,24 @@ jobs:
           from google_auth_oauthlib.flow import InstalledAppFlow
           from googleapiclient.discovery import build
 
-          # API KEYS
           GEMINI_KEY = "AIzaSyBs3-vbv7XF_8uCGcKRjQxEQVBCVYCh1G0"
           YT_CLIENT_ID = "73026014910-1ui7eu29pqcclsmaf435ad8frm7clkr0.apps.googleusercontent.com"
           YT_CLIENT_SECRET = "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"
-          LOG_FILE = r"C:\Users\Public\Desktop\AI_Channel_Pro_Report.csv"
+          LOG_FILE = r"C:\Users\Public\Desktop\Channel_Report.csv"
 
           genai.configure(api_key=GEMINI_KEY)
-          gem_model = genai.GenerativeModel('gemini-pro')
+          model = genai.GenerativeModel('gemini-pro')
 
-          def get_ai_creative_data():
-              # Feature: Smart AI Niche & Content
-              prompt = "Think of a unique YouTube niche. Give me a creative Channel Name and a professional 30-word 'About' section including 3 SEO tags. Format: Name | About"
+          def get_ai_data():
+              prompt = "Creative YouTube channel name and 30-word About section with SEO tags. Format: Name | About"
               try:
-                  response = gem_model.generate_content(prompt)
-                  parts = response.text.split('|')
-                  return parts[0].strip(), parts[1].strip()
+                  response = model.generate_content(prompt)
+                  return response.text.split('|')[0].strip(), response.text.split('|')[1].strip()
               except:
-                  return f"Titan Global {random.randint(100,999)}", "Advanced automated content hub."
-
-          def rotate_ip():
-              # Feature: IP Rotation via Warp
-              print("[!] Rotating IP for safety...")
-              os.system('\"C:\\Program Files\\Cloudflare\\Cloudflare WARP\\warp-cli.exe\" disconnect')
-              time.sleep(10)
-              os.system('\"C:\\Program Files\\Cloudflare\\Cloudflare WARP\\warp-cli.exe\" connect')
-              time.sleep(15)
+                  return f"Titan_{random.randint(100,999)}", "Quality automation content."
 
           def main():
-              print("--- TITAN AI-PRO FACTORY STARTING ---")
+              print("--- TITAN AI FACTORY ACTIVE ---")
               flow = InstalledAppFlow.from_client_config(
                   {"installed": {"client_id": YT_CLIENT_ID, "client_secret": YT_CLIENT_SECRET, "auth_uri": "https://accounts.google.com/o/oauth2/auth", "token_uri": "https://oauth2.googleapis.com/token"}},
                   ['https://www.googleapis.com/auth/youtube.force-ssl'])
@@ -72,37 +83,24 @@ jobs:
 
               with open(LOG_FILE, mode='a', newline='', encoding='utf-8') as file:
                   writer = csv.writer(file)
-                  if os.stat(LOG_FILE).st_size == 0:
-                      writer.writerow(["Channel Name", "AI Description", "Status", "Time"])
+                  writer.writerow(["Name", "Description", "Time"])
 
                   for i in range(50):
-                      if i > 0 and i % 10 == 0:
-                          rotate_ip() # Feature: IP Rotation every 10 channels
-
-                      name, about = get_ai_creative_data()
+                      name, about = get_ai_data()
                       try:
-                          # Feature: SEO Integrated Creation
-                          youtube.channels().insert(
-                              part="snippet", 
-                              body={"snippet": {"title": name, "description": about}}
-                          ).execute()
-                          
-                          print(f"[+] Success {i+1}/50: {name}")
-                          writer.writerow([name, about, "Created", time.ctime()])
+                          youtube.channels().insert(part="snippet", body={"snippet": {"title": name, "description": about}}).execute()
+                          print(f"[+] {i+1}/50 Created: {name}")
+                          writer.writerow([name, about, time.ctime()])
                       except Exception as e:
-                          print(f"[-] Error at {name}: {e}")
-                          writer.writerow([name, about, f"Error: {e}", time.ctime()])
+                          print(f"[-] Error: {e}")
                       
-                      # Feature: Human-Like Delay
-                      delay = random.randint(60, 150)
-                      print(f"Waiting {delay}s for Google safety...")
-                      time.sleep(delay)
+                      time.sleep(random.randint(60, 120))
 
           if __name__ == "__main__":
               main()
           "@
-          $script | Out-File -FilePath "C:\Users\Public\Desktop\AI_FACTORY_PRO.py" -Encoding ascii
-          "@echo off`ntitle TITAN AI-PRO FACTORY`npython C:\Users\Public\Desktop\AI_FACTORY_PRO.py`npause" | Out-File -FilePath "C:\Users\Public\Desktop\START_PRO_CREATOR.bat" -Encoding ascii
+          $script | Out-File -FilePath "C:\Users\Public\Desktop\AI_FACTORY.py" -Encoding ascii
+          "@echo off`npython C:\Users\Public\Desktop\AI_FACTORY.py`npause" | Out-File -FilePath "C:\Users\Public\Desktop\START_AI.bat" -Encoding ascii
 
-      - name: 4. Keep-Alive
+      - name: 5. Keep-Alive
         run: Start-Sleep -Seconds 32400
