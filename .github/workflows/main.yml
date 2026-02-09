@@ -1,4 +1,4 @@
-name: TITAN-V180-WARP-AI-STABLE
+name: TITAN-V181-WARP-FIXED
 
 on:
   workflow_dispatch:
@@ -7,12 +7,14 @@ jobs:
   build:
     runs-on: windows-latest
     steps:
-      - name: 1. Speed Up & Warp Install
+      - name: 1. Setup & Warp Installation
         shell: powershell
         run: |
           Stop-Service -Name wuauserv, SysMain, AudioEndpointBuilder, audiosrv -Force
-          # Installing Cloudflare Warp & Requirements
+          # Warp Install using Choco
           choco install cloudflare-warp -y
+          # Wait for installation to finish
+          Start-Sleep -Seconds 30
           pip install pyautogui psutil --quiet
           winget install --id Mozilla.Firefox -e --silent --accept-source-agreements
 
@@ -25,18 +27,28 @@ jobs:
           & "$env:ProgramFiles\Tailscale\tailscale.exe" up --accept-dns=false --force-reauth
           Start-Sleep -Seconds 120
 
-      - name: 3. Activate Cloudflare Warp (System-Wide IP)
+      - name: 3. Activate Warp (FIXED PATH LOGIC)
         shell: powershell
         run: |
-          & "C:\Program Files\Cloudflare\Cloudflare WARP\warp-cli.exe" --accept-tos registration register
-          & "C:\Program Files\Cloudflare\Cloudflare WARP\warp-cli.exe" --accept-tos mode warp
-          & "C:\Program Files\Cloudflare\Cloudflare WARP\warp-cli.exe" --accept-tos connect
-          Write-Host "Cloudflare WARP is Active!" -ForegroundColor Cyan
+          # Finding warp-cli.exe manually to avoid error
+          $warpPath = "C:\Program Files\Cloudflare\Cloudflare WARP\warp-cli.exe"
+          if (Test-Path $warpPath) {
+              & $warpPath --accept-tos registration register
+              & $warpPath --accept-tos mode warp
+              & $warpPath --accept-tos connect
+              Write-Host "Cloudflare WARP Connected Successfully!" -ForegroundColor Green
+          } else {
+              Write-Host "Warp Path Not Found! Trying alternative..." -ForegroundColor Red
+              # Try to refresh environment variables
+              $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+              warp-cli --accept-tos registration register
+              warp-cli --accept-tos connect
+          }
 
-      - name: 4. Deploy AI-Integrated Multi-Video Bot
+      - name: 4. Deploy AI Watcher Script
         run: |
           $script = @"
-          import os, time, subprocess, threading, pyautogui, random, psutil
+          import os, time, subprocess, threading, pyautogui, random
 
           VIDEO_LINKS = [
               "https://youtu.be/oiyYa3IL2Rc?si=LnzHB2SnxLvotRp-",
@@ -46,44 +58,29 @@ jobs:
               "https://youtu.be/ZkJlQ_q7x5Q?si=5vafU9AuYNTZcp5E"
           ]
 
-          # --- AI INTEGRATED MOVEMENT (ANTI-BOT) ---
-          def ai_movement():
-              print("AI Movement Bot Started...")
+          def ai_bot():
               while True:
-                  t = random.randint(15, 45)
-                  time.sleep(t)
-                  choice = random.choice(['move', 'scroll', 'key'])
-                  if choice == 'move':
-                      pyautogui.moveRel(random.randint(-10, 10), random.randint(-10, 10))
-                  elif choice == 'scroll':
-                      pyautogui.scroll(random.randint(-200, 200))
-                  else:
-                      pyautogui.press('f15')
+                  time.sleep(random.randint(20, 50))
+                  pyautogui.press('f15')
+                  pyautogui.moveRel(random.randint(-2, 2), random.randint(-2, 2))
 
           def launch():
               ff = r'C:\Program Files\Mozilla Firefox\firefox.exe'
-              tab_count = 0
-              for link in VIDEO_LINKS:
-                  for repeat in range(3): # 15 Total Tabs
-                      tab_count += 1
-                      p = f'C:\\Users\\Public\\P_{tab_count}'
-                      if not os.path.exists(p): os.makedirs(p)
-                      
-                      with open(os.path.join(p, "prefs.js"), "w") as f:
-                          f.write('user_pref("media.volume_scale", "0.0");\n')
-                          f.write('user_pref("permissions.default.image", 2);\n')
-                          # --- FORCE 144P & PERFORMANCE ---
-                          f.write('user_pref("media.autoplay.default", 0);\n')
-                          f.write('user_pref("dom.ipc.plugins.enabled.libflashplayer.so", "false");\n')
-                          f.write('user_pref("browser.sessionstore.resume_from_crash", false);\n')
-
-                      # Append loop command to URL if possible or handle via browser
-                      subprocess.Popen([ff, "-new-instance", "-profile", p, "-no-remote", link])
-                      print(f"Tab {tab_count} launched via Warp.")
-                      time.sleep(12)
+              for i in range(15):
+                  p = f'C:\\Users\\Public\\P_{i}'
+                  if not os.path.exists(p): os.makedirs(p)
+                  with open(os.path.join(p, "prefs.js"), "w") as f:
+                      f.write('user_pref("media.volume_scale", "0.0");\n')
+                      f.write('user_pref("permissions.default.image", 2);\n')
+                      f.write('user_pref("browser.sessionstore.resume_from_crash", false);\n')
+                  
+                  # Har video ko 3 profiles mein chalanay ka logic
+                  link = VIDEO_LINKS[i % len(VIDEO_LINKS)]
+                  subprocess.Popen([ff, "-new-instance", "-profile", p, "-no-remote", link])
+                  time.sleep(15)
 
           if __name__ == "__main__":
-              threading.Thread(target=ai_movement, daemon=True).start()
+              threading.Thread(target=ai_bot, daemon=True).start()
               launch()
           "@
           $script | Out-File -FilePath "C:\Users\Public\Desktop\TITAN_AI.py" -Encoding ascii
