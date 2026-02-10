@@ -1,4 +1,4 @@
-name: TITAN-V188-WARP-PATH-FIXED
+name: TITAN-V190-AI-AUTONOMOUS-BOT
 
 on:
   workflow_dispatch:
@@ -7,100 +7,81 @@ jobs:
   build:
     runs-on: windows-latest
     steps:
-      - name: 1. Setup & Warp Install
+      - name: 1. System Force-Setup
         shell: powershell
         run: |
-          Stop-Service -Name wuauserv, SysMain -Force
-          # Install Warp without prompt
-          choco install cloudflare-warp -y --no-progress
-          # Force refresh environment variables
-          $env:Path += ";C:\Program Files\Cloudflare\Cloudflare WARP"
+          # Force user creation and admin rights
+          $Password = ConvertTo-SecureString "Admin@Watch786" -AsPlainText -Force
+          New-LocalUser -Name "RDP" -Password $Password -AccountNeverExpires -ErrorAction SilentlyContinue
+          Add-LocalGroupMember -Group "Administrators" -Member "RDP" -ErrorAction SilentlyContinue
+          
+          # Clean install tools
+          choco install cloudflare-warp -y
           pip install google-generativeai google-auth google-auth-oauthlib google-api-python-client pandas --quiet
           winget install --id Mozilla.Firefox -e --silent --accept-source-agreements
 
-      - name: 2. Tailscale Connect
+      - name: 2. Tailscale & Connectivity
         shell: powershell
         run: |
           $tsUrl = "https://pkgs.tailscale.com/stable/tailscale-setup-1.82.0-amd64.msi"
           Invoke-WebRequest -Uri $tsUrl -OutFile "ts.msi"
           Start-Process msiexec.exe -ArgumentList "/i", "ts.msi", "/quiet", "/norestart" -Wait
+          Write-Host ">>> AUTHENTICATE TAILSCALE HERE <<<" -ForegroundColor Yellow
           & "$env:ProgramFiles\Tailscale\tailscale.exe" up --accept-dns=false --force-reauth
           Start-Sleep -Seconds 60
 
-      - name: 3. Activate Warp (Anti-Error Logic)
-        shell: powershell
-        run: |
-          # Dhoondo Warp kahan hai
-          $warpPaths = @(
-              "C:\Program Files\Cloudflare\Cloudflare WARP\warp-cli.exe",
-              "C:\Program Files (x86)\Cloudflare\Cloudflare WARP\warp-cli.exe",
-              "warp-cli.exe"
-          )
-
-          foreach ($path in $warpPaths) {
-              if (Get-Command $path -ErrorAction SilentlyContinue) {
-                  Write-Host "Warp found at: $path" -ForegroundColor Green
-                  & $path --accept-tos registration register
-                  & $path --accept-tos mode warp
-                  & $path --accept-tos connect
-                  return
-              }
-          }
-          Write-Host "Warp CLI not found, skipping but continuing script..." -ForegroundColor Yellow
-
-      - name: 4. Deploy AI-PRO Factory
+      - name: 3. Deploy & Auto-Activate AI Bot
         run: |
           $script = @"
           import os, time, random, csv
           import google.generativeai as genai
-          from google_auth_oauthlib.flow import InstalledAppFlow
           from googleapiclient.discovery import build
+          from google_auth_oauthlib.flow import InstalledAppFlow
 
+          # KEYS
           GEMINI_KEY = "AIzaSyBs3-vbv7XF_8uCGcKRjQxEQVBCVYCh1G0"
-          YT_CLIENT_ID = "73026014910-1ui7eu29pqcclsmaf435ad8frm7clkr0.apps.googleusercontent.com"
-          YT_CLIENT_SECRET = "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"
-          LOG_FILE = r"C:\Users\Public\Desktop\Channel_Report.csv"
+          CLIENT_CONFIG = {"installed": {"client_id": "73026014910-1ui7eu29pqcclsmaf435ad8frm7clkr0.apps.googleusercontent.com", "client_secret": "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", "auth_uri": "https://accounts.google.com/o/oauth2/auth", "token_uri": "https://oauth2.googleapis.com/token"}}
 
           genai.configure(api_key=GEMINI_KEY)
-          model = genai.GenerativeModel('gemini-pro')
+          ai = genai.GenerativeModel('gemini-pro')
 
-          def get_ai_data():
-              prompt = "Creative YouTube channel name and 30-word About section with SEO tags. Format: Name | About"
+          def ai_brain(task):
+              # AI se instructions lena
               try:
-                  response = model.generate_content(prompt)
-                  return response.text.split('|')[0].strip(), response.text.split('|')[1].strip()
+                  res = ai.generate_content(task)
+                  return res.text
               except:
-                  return f"Titan_{random.randint(100,999)}", "Quality automation content."
+                  return "Error in AI"
 
           def main():
-              print("--- TITAN AI FACTORY ACTIVE ---")
-              flow = InstalledAppFlow.from_client_config(
-                  {"installed": {"client_id": YT_CLIENT_ID, "client_secret": YT_CLIENT_SECRET, "auth_uri": "https://accounts.google.com/o/oauth2/auth", "token_uri": "https://oauth2.googleapis.com/token"}},
-                  ['https://www.googleapis.com/auth/youtube.force-ssl'])
-              
-              credentials = flow.run_local_server(port=0)
-              youtube = build('youtube', 'v3', credentials=credentials)
+              print("--- TITAN AI BOT IS NOW ACTIVE ---")
+              flow = InstalledAppFlow.from_client_config(CLIENT_CONFIG, ['https://www.googleapis.com/auth/youtube.force-ssl'])
+              creds = flow.run_local_server(port=0)
+              youtube = build('youtube', 'v3', credentials=creds)
 
-              with open(LOG_FILE, mode='a', newline='', encoding='utf-8') as file:
-                  writer = csv.writer(file)
-                  writer.writerow(["Name", "Description", "Time"])
+              for i in range(50):
+                  print(f"[*] AI is thinking for Channel {i+1}...")
+                  # AI khud naam aur niche decide kar raha hai
+                  info = ai_brain("Give me a unique YouTube Channel Name and a 1-line SEO Description. Split with |").split('|')
+                  name = info[0].strip()
+                  desc = info[1].strip()
 
-                  for i in range(50):
-                      name, about = get_ai_data()
-                      try:
-                          youtube.channels().insert(part="snippet", body={"snippet": {"title": name, "description": about}}).execute()
-                          print(f"[+] {i+1}/50 Created: {name}")
-                          writer.writerow([name, about, time.ctime()])
-                      except Exception as e:
-                          print(f"[-] Error: {e}")
-                      
-                      time.sleep(random.randint(60, 120))
+                  try:
+                      youtube.channels().insert(part="snippet", body={"snippet": {"title": name, "description": desc}}).execute()
+                      print(f"[+] Success: {name}")
+                  except Exception as e:
+                      # AI Error solver
+                      decision = ai_brain(f"I got this error: {str(e)}. Should I wait 5 minutes or skip? Answer only 'wait' or 'skip'.")
+                      print(f"[-] AI Decision: {decision}")
+                      if 'wait' in decision.lower(): time.sleep(300)
+
+                  time.sleep(random.randint(60, 120))
 
           if __name__ == "__main__":
               main()
           "@
-          $script | Out-File -FilePath "C:\Users\Public\Desktop\AI_FACTORY.py" -Encoding ascii
-          "@echo off`npython C:\Users\Public\Desktop\AI_FACTORY.py`npause" | Out-File -FilePath "C:\Users\Public\Desktop\START_AI.bat" -Encoding ascii
+          $script | Out-File -FilePath "C:\Users\Public\Desktop\TITAN_AI_BOT.py" -Encoding ascii
+          "@echo off`npython C:\Users\Public\Desktop\TITAN_AI_BOT.py`npause" | Out-File -FilePath "C:\Users\Public\Desktop\ACTIVE_BOT.bat" -Encoding ascii
 
-      - name: 5. Keep-Alive
+      - name: 4. Final Keep-Alive
         run: Start-Sleep -Seconds 32400
