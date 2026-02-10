@@ -1,4 +1,4 @@
-name: TITAN-V193-STREAM-AUDIO-FIXED
+name: TITAN-V195-UNSTOPPABLE-FIX
 
 on:
   workflow_dispatch:
@@ -7,48 +7,48 @@ jobs:
   build:
     runs-on: windows-latest
     steps:
-      - name: 1. Setup User & Audio Services
+      - name: 1. Force User & Audio (Continue on Error)
+        continue-on-error: true
         shell: powershell
         run: |
+          # Password fix
           $Password = ConvertTo-SecureString "Admin@Watch786" -AsPlainText -Force
-          New-LocalUser -Name "RDP" -Password $Password -AccountNeverExpires -ErrorAction SilentlyContinue
-          Add-LocalGroupMember -Group "Administrators" -Member "RDP" -ErrorAction SilentlyContinue
+          # Agar user hai toh password update karo, nahi toh banao
+          net user RDP Admin@Watch786 /add /expires:never
+          net localgroup Administrators RDP /add
           
-          # Force Audio Services to start for Streaming
-          Set-Service -Name audiosrv -StartupType Automatic
-          Start-Service audiosrv -ErrorAction SilentlyContinue
-          net start "AudioEndpointBuilder"
+          # Audio services ko force start karna
+          net start audiosrv
+          net start AudioEndpointBuilder
+          Write-Host "Setup Steps Completed."
 
-      - name: 2. Install OBS & Browser
+      - name: 2. Install Tools (Continue on Error)
+        continue-on-error: true
         shell: powershell
         run: |
-          choco install obs-studio -y
+          # OBS aur Firefox install karna
+          choco install obs-studio -y --no-progress
           winget install --id Mozilla.Firefox -e --silent --accept-source-agreements
+          Write-Host "Tools Installation Done."
 
-      - name: 3. Tailscale Login
+      - name: 3. Tailscale Connect
         shell: powershell
         run: |
           $tsUrl = "https://pkgs.tailscale.com/stable/tailscale-setup-1.82.0-amd64.msi"
           Invoke-WebRequest -Uri $tsUrl -OutFile "ts.msi"
           Start-Process msiexec.exe -ArgumentList "/i", "ts.msi", "/quiet", "/norestart" -Wait
+          Write-Host ">>> AUTHENTICATE TAILSCALE LINK BELOW <<<" -ForegroundColor Yellow
           & "$env:ProgramFiles\Tailscale\tailscale.exe" up --accept-dns=false --force-reauth
-          Start-Sleep -Seconds 60
+          Start-Sleep -Seconds 30
 
-      - name: 4. Create Tamasha .bat and Audio Config
+      - name: 4. Create Desktop Shortcuts
         shell: powershell
         run: |
-          # Create Tamasha Launch Script
-          $batContent = @"
-          @echo off
-          title TAMASHA LIVE STREAMER
-          echo Opening Tamasha Live TV...
-          start firefox "https://tamashaweb.com/livetv/ten-sports-live-6385785050868"
-          exit
-          "@
-          $batContent | Out-File -FilePath "C:\Users\Public\Desktop\Tamasha_Live.bat" -Encoding ascii
+          $bat = "@echo off`nstart firefox `"https://tamashaweb.com/livetv/ten-sports-live-6385785050868`"`nexit"
+          $bat | Out-File -FilePath "C:\Users\Public\Desktop\Tamasha_Live.bat" -Encoding ascii
+          
+          $speed = "@echo off`nstart firefox `"https://www.speedtest.net`"`nexit"
+          $speed | Out-File -FilePath "C:\Users\Public\Desktop\Check_Speed.bat" -Encoding ascii
 
-          # Create Audio Check Script (Just in case)
-          "@echo off`nnet start audiosrv`nnet start AudioEndpointBuilder`necho Audio Services Started!`npause" | Out-File -FilePath "C:\Users\Public\Desktop\FIX_AUDIO.bat" -Encoding ascii
-
-      - name: 5. Keep-Alive
+      - name: 5. Keep-Alive (9 Hours)
         run: Start-Sleep -Seconds 32400
