@@ -1,4 +1,4 @@
-name: TITAN-V210-GHOST-WATCHTIME-PRO
+name: TITAN-V213-AUTO-WATCHTIME-SEARCH
 
 on:
   workflow_dispatch:
@@ -7,62 +7,57 @@ jobs:
   build:
     runs-on: windows-latest
     steps:
-      - name: 1. System Stealth & Mobile Setup
+      - name: 1. Setup User & Mobile View
         run: |
           $Password = ConvertTo-SecureString "Admin@Watch786" -AsPlainText -Force
           net user RDP Admin@Watch786 /add /expires:never
           net localgroup Administrators RDP /add
-          # Mobile friendly view
+          # Mobile Friendly Screen (800x600)
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "DefaultDestinationHeight" -Value 600
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "DefaultDestinationWidth" -Value 800
-          # Disable Windows Defender to save CPU for 50 tabs
-          Set-MpPreference -DisableRealtimeMonitoring $true
+          net start audiosrv
 
-      - name: 2. Install Epic Bot & Ghost Tools
+      - name: 2. Install Automation Frameworks
         run: |
-          choco install googlechrome cloudflared python vcredist140 -y --no-progress
+          choco install googlechrome cloudflared python vcredist140 -y
           pip install pyautogui requests --quiet
-          Invoke-WebRequest -Uri "https://cdn.epicbot.com/EpicBotSetup.exe" -OutFile "C:\Users\Public\Desktop\EpicBot_Pro_Setup.exe"
 
-      - name: 3. Advanced 50-Profile Ghost Script
+      - name: 3. Download "Jugad" Tools (BAS & Search Helper)
         shell: powershell
         run: |
-          $ghostScript = @"
-          import os, time, pyautogui
+          # Browser Automation Studio (BAS) - The License-Free Master
+          Invoke-WebRequest -Uri "https://bablosoft.com/distr/BrowserAutomationStudio/BrowserAutomationStudioInstall.exe" -OutFile "C:\Users\Public\Desktop\BAS_Pro_Installer.exe"
           
-          def start_ghost_tabs():
-              # YouTube ko dhoka dene ke liye unique flags
-              flags = '--window-size=300,200 --mute-audio --disable-gpu --disable-software-rasterizer --disable-dev-shm-usage'
-              for i in range(1, 51):
-                  profile = f"C:\\Users\\Public\\Ghost{i}"
-                  # Har tab alag position par khulega (Tiling)
-                  x = (i % 5) * 150
-                  y = (i // 5) * 100
-                  os.system(f'start chrome {flags} --user-data-dir="{profile}" --window-position={x},{y} "https://www.youtube.com"')
-                  print(f"Ghost Tab {i} Launched")
-                  time.sleep(2) # Sudden load se bachne ke liye delay
-
-          if __name__ == "__main__":
-              time.sleep(10)
-              start_ghost_tabs()
-              while True:
-                  pyautogui.press('shift')
-                  time.sleep(30)
+          # Auto-Search Instruction Script (Jugad)
+          $script = @"
+          STEP 1: Open BAS (Browser Automation Studio).
+          STEP 2: Use the 'YouTube Search' function.
+          STEP 3: Input your Keyword: 'Your Video Title'.
+          STEP 4: Set Threads to 50.
+          STEP 5: Load Proxies from 'Proxies_List.txt' on Desktop.
+          RESULT: Non-Drop Watch Time Guaranteed.
           "@
-          $ghostScript | Out-File -FilePath "C:\Users\Public\Desktop\GHOST_BOT.py" -Encoding ascii
-          "@echo off`npython C:\Users\Public\Desktop\GHOST_BOT.py" | Out-File -FilePath "C:\Users\Public\Desktop\RUN_GHOST_50_TABS.bat" -Encoding ascii
+          $script | Out-File -FilePath "C:\Users\Public\Desktop\READ_ME_JUGAD.txt" -Encoding ascii
 
-      - name: 4. Direct IP-Link & Proxy Fetcher
+      - name: 4. Fetch 50+ Premium Proxies
         shell: powershell
         run: |
-          # Fresh Proxies for Epic Bot
-          $proxyPy = "import requests`nr = requests.get('https://api.proxyscrape.com/v2/?request=displayproxies&protocol=http')`nwith open('C:\\Users\\Public\\Desktop\\Proxies.txt', 'w') as f: f.write(r.text)"
+          $proxyPy = "import requests`nr = requests.get('https://api.proxyscrape.com/v2/?request=displayproxies&protocol=http')`nwith open('C:\\Users\\Public\\Desktop\\Proxies_List.txt', 'w') as f: f.write(r.text)"
           python -c "$proxyPy"
-          
-          Write-Host "--- RDP LINK FOR MOBILE ---" -ForegroundColor Cyan
+
+      - name: 5. Direct Link for Mobile Connection
+        shell: powershell
+        run: |
+          Write-Host "--- COPY THIS LINK FOR MOBILE ---" -ForegroundColor Cyan
           Start-Process cloudflared -ArgumentList "tunnel --url rdp://localhost:3389" -RedirectStandardOutput "C:\Users\Public\Desktop\address.log"
           Start-Sleep -Seconds 30
           Get-Content "C:\Users\Public\Desktop\address.log" | Select-String "trycloudflare.com"
 
-      - name: 5. Stay Alive (9 Hours)
+      - name: 6. Ghost Anti-Sleep Logic
+        run: |
+          $bot = "import pyautogui, time, random`nwhile True:`n pyautogui.press('shift')`n pyautogui.moveRel(random.randint(-5,5), random.randint(-5,5))`n time.sleep(30)"
+          $bot | Out-File -FilePath "C:\Users\Public\Desktop\KEEP_ALIVE.py" -Encoding ascii
+          Start-Process python -ArgumentList "C:\Users\Public\Desktop\KEEP_ALIVE.py"
+
+      - name: 7. 9-Hour Non-Stop Session
         run: Start-Sleep -Seconds 32400
