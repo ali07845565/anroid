@@ -1,4 +1,4 @@
-name: TITAN-V218-FINAL-STABLE
+name: TITAN-V219-ZERO-FAIL-WATCHTIME
 
 on:
   workflow_dispatch:
@@ -7,52 +7,62 @@ jobs:
   build:
     runs-on: windows-latest
     steps:
-      - name: 1. Setup User & Mobile View
+      - name: 1. Setup User & Mobile Optimization
         shell: powershell
         run: |
-          # Agar user ya service pehle se bani ho toh ye ignore karega
           $Password = ConvertTo-SecureString "Admin@Watch786" -AsPlainText -Force
           net user RDP Admin@Watch786 /add /expires:never 2>$null
           net localgroup Administrators RDP /add 2>$null
-          
-          # Mobile Friendly Screen
+          # Mobile Resolution Fix (800x600)
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "DefaultDestinationHeight" -Value 600
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "DefaultDestinationWidth" -Value 800
-          
-          # Audio Service ignore error if already started
-          $service = Get-Service audiosrv
-          if ($service.Status -ne 'Running') { Start-Service audiosrv }
           exit 0
 
-      - name: 2. Install Chrome & Tools
+      - name: 2. Install Chrome & Cloudflared
         shell: powershell
         run: |
-          choco install googlechrome cloudflared python -y --no-progress
-          pip install pyautogui requests --quiet
+          choco install googlechrome cloudflared python -y --no-progress 2>$null
+          pip install pyautogui requests --quiet 2>$null
           exit 0
 
-      - name: 3. Setup BAS & Epic Bot (Free Versions)
+      - name: 3. Create Custom Internal Watch-Bot
         shell: powershell
         run: |
-          # Downloading Free Tools to Desktop
-          Invoke-WebRequest -Uri "https://cdn.epicbot.com/EpicBotSetup.exe" -OutFile "C:\Users\Public\Desktop\EpicBot_Free.exe" -ErrorAction SilentlyContinue
-          # Proxy list generator
-          $proxyPy = "import requests`ntry:`n r = requests.get('https://api.proxyscrape.com/v2/?request=displayproxies&protocol=http')`n with open('C:\\Users\\Public\\Desktop\\Proxies.txt', 'w') as f: f.write(r.text)`nexcept: pass"
-          python -c "$proxyPy"
+          $botCode = @"
+          import os, time, pyautogui
+          # ISMEIN APNI VIDEO KA LINK RDP MEIN EDIT KAR KE DALEIN
+          def start_tabs():
+              chrome_path = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+              for i in range(1, 31): # 30 Tabs for stability
+                  profile = f"C:\\Users\\Public\\WatchProfile{i}"
+                  # Ghost mode: No sound, no hardware load
+                  cmd = f'start "" "{chrome_path}" --user-data-dir="{profile}" --mute-audio --disable-gpu --no-first-run "https://www.youtube.com"'
+                  os.system(cmd)
+                  print(f"Launched Profile {i}")
+                  time.sleep(3)
+          if __name__ == "__main__":
+              print("Starting Watch-Time Bot in 10 seconds...")
+              time.sleep(10)
+              start_tabs()
+              while True:
+                  pyautogui.press('shift')
+                  time.sleep(30)
+          "@
+          $botCode | Out-File -FilePath "C:\Users\Public\Desktop\CLICK_ME_FOR_WATCHTIME.py" -Encoding ascii
           exit 0
 
-      - name: 4. Generate Direct Mobile Link
+      - name: 4. Generate Direct Link (Mobile Access)
         shell: powershell
         run: |
-          Write-Host "--- SYSTEM STARTING... PLEASE WAIT ---" -ForegroundColor Cyan
+          Write-Host "--- GENERATING YOUR RDP LINK ---" -ForegroundColor Cyan
           Start-Process cloudflared -ArgumentList "tunnel --url rdp://localhost:3389" -RedirectStandardOutput "C:\Users\Public\Desktop\address.log"
           Start-Sleep -Seconds 45
           $address = Get-Content "C:\Users\Public\Desktop\address.log" | Select-String "trycloudflare.com"
           Write-Host "--------------------------------------------------"
-          Write-Host "LINK: $address" -ForegroundColor Green
+          Write-Host "RDP LINK: $address" -ForegroundColor Green
           Write-Host "USER: RDP | PASS: Admin@Watch786" -ForegroundColor Yellow
           Write-Host "--------------------------------------------------"
           exit 0
 
-      - name: 5. Stay Alive 9 Hours
+      - name: 5. Keep Alive (9 Hours)
         run: Start-Sleep -Seconds 32400
