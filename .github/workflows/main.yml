@@ -1,4 +1,4 @@
-name: TITAN-V214-FINAL-FIXED-WATCHTIME
+name: TITAN-V217-FREE-LEGEND-SETUP
 
 on:
   workflow_dispatch:
@@ -7,54 +7,63 @@ jobs:
   build:
     runs-on: windows-latest
     steps:
-      - name: 1. Setup User & Mobile View (Error Fixed)
+      - name: 1. Setup User & Mobile View
         shell: powershell
         run: |
-          # Password aur User setup (Error handling added)
           $Password = ConvertTo-SecureString "Admin@Watch786" -AsPlainText -Force
-          net user RDP Admin@Watch786 /add /expires:never /ErrorAction SilentlyContinue
-          net localgroup Administrators RDP /add /ErrorAction SilentlyContinue
-          
-          # Mobile Resolution Fix
+          net user RDP Admin@Watch786 /add /expires:never
+          net localgroup Administrators RDP /add
+          # Mobile friendly resolution
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "DefaultDestinationHeight" -Value 600
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "DefaultDestinationWidth" -Value 800
-          
-          # Audio Service (Stop and Start to avoid 2182 error)
-          net stop audiosrv /y 2>$null
-          net start audiosrv /y 2>$null
+          net start audiosrv 2>$null
           exit 0
 
-      - name: 2. Install BAS & Pro Tools
+      - name: 2. Install Chrome & Epic/BAS Dependencies
         shell: powershell
         run: |
           choco install googlechrome cloudflared python vcredist140 -y --no-progress
           pip install pyautogui requests --quiet
 
-      - name: 3. Download Automation Jugad (BAS)
+      - name: 3. Download Free Automation Tools
         shell: powershell
         run: |
-          # BAS Installer for Watch Time
-          Invoke-WebRequest -Uri "https://bablosoft.com/distr/BrowserAutomationStudio/BrowserAutomationStudioInstall.exe" -OutFile "C:\Users\Public\Desktop\BAS_Pro_Installer.exe"
-          # Proxy List Fetcher
+          # 1. Epic Bot (Free Version Setup)
+          Invoke-WebRequest -Uri "https://cdn.epicbot.com/EpicBotSetup.exe" -OutFile "C:\Users\Public\Desktop\EpicBot_Free.exe"
+          # 2. BAS (Full Free Automation)
+          Invoke-WebRequest -Uri "https://bablosoft.com/distr/BrowserAutomationStudio/BrowserAutomationStudioInstall.exe" -OutFile "C:\Users\Public\Desktop\BAS_Full_Free.exe"
+          # 3. Fresh Proxy List
           $proxyPy = "import requests`nr = requests.get('https://api.proxyscrape.com/v2/?request=displayproxies&protocol=http')`nwith open('C:\\Users\\Public\\Desktop\\Proxies_List.txt', 'w') as f: f.write(r.text)"
           python -c "$proxyPy"
 
-      - name: 4. Generate Direct Mobile Link
+      - name: 4. Create "No-Drop" Auto-Search Script
         shell: powershell
         run: |
-          Write-Host "--------------------------------------------------" -ForegroundColor Cyan
-          Write-Host "WAITING FOR DIRECT RDP LINK..." -ForegroundColor Yellow
+          $bot = @"
+          import os, time, pyautogui
+          # ISMEIN APNA LINK DALEIN RDP KE ANDAR
+          def start_watchtime():
+              for i in range(1, 51):
+                  profile = f"C:\\Users\\Public\\Profile{i}"
+                  # Ghost mode settings
+                  os.system(f'start chrome --user-data-dir="{profile}" --mute-audio --disable-gpu "https://www.youtube.com"')
+                  time.sleep(3)
+          if __name__ == "__main__":
+              start_watchtime()
+              while True:
+                  pyautogui.press('shift')
+                  time.sleep(30)
+          "@
+          $bot | Out-File -FilePath "C:\Users\Public\Desktop\PYTHON_WATCH_BOT.py" -Encoding ascii
+
+      - name: 5. Generate Direct Connection Link
+        shell: powershell
+        run: |
+          Write-Host "--- COPY THIS LINK FOR MOBILE RDP ---" -ForegroundColor Cyan
           Start-Process cloudflared -ArgumentList "tunnel --url rdp://localhost:3389" -RedirectStandardOutput "C:\Users\Public\Desktop\address.log"
-          Start-Sleep -Seconds 35
+          Start-Sleep -Seconds 45
           $link = Get-Content "C:\Users\Public\Desktop\address.log" | Select-String "trycloudflare.com"
           Write-Host "YOUR LINK: $link" -ForegroundColor Green
-          Write-Host "--------------------------------------------------" -ForegroundColor Cyan
 
-      - name: 5. Anti-Sleep Ghost Bot
-        run: |
-          $bot = "import pyautogui, time, random`nwhile True:`n pyautogui.press('shift')`n pyautogui.moveRel(random.randint(-5,5), random.randint(-5,5))`n time.sleep(30)"
-          $bot | Out-File -FilePath "C:\Users\Public\Desktop\KEEP_ALIVE.py" -Encoding ascii
-          Start-Process python -ArgumentList "C:\Users\Public\Desktop\KEEP_ALIVE.py"
-
-      - name: 6. 9-Hour Non-Stop Session
+      - name: 6. 9-Hour Non-Stop Power
         run: Start-Sleep -Seconds 32400
