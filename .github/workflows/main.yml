@@ -1,64 +1,78 @@
-name: TITAN-V220-TAILSCALE-EDITION
+name: TITAN-V221-FINAL-FIXED-TAILSCALE
 
 on:
   workflow_dispatch:
     inputs:
       tailscale_auth_key:
-        description: 'Apni Tailscale Auth Key yahan dalein'
+        description: 'Tailscale Auth Key Dalein'
         required: true
 
 jobs:
   build:
     runs-on: windows-latest
     steps:
-      - name: 1. Setup User & Mobile View
+      - name: 1. Setup User & Mobile Screen
         shell: powershell
         run: |
           $Password = ConvertTo-SecureString "Admin@Watch786" -AsPlainText -Force
           net user RDP Admin@Watch786 /add /expires:never 2>$null
           net localgroup Administrators RDP /add 2>$null
-          # Mobile Resolution (800x600)
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "DefaultDestinationHeight" -Value 600
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "DefaultDestinationWidth" -Value 800
           exit 0
 
-      - name: 2. Install Tailscale & Chrome
+      - name: 2. Install Tools (Chrome, Tailscale, Python)
         shell: powershell
         run: |
           choco install googlechrome tailscale python -y --no-progress
           pip install pyautogui requests --quiet
           exit 0
 
-      - name: 3. Connect to Tailscale
+      - name: 3. Connect Tailscale (Path Fix)
         shell: powershell
         run: |
-          # Tailscale ko login karne ki command
-          tailscale up --authkey ${{ github.event.inputs.tailscale_auth_key }}
-          Start-Sleep -Seconds 10
-          Write-Host "Tailscale Connected!" -ForegroundColor Green
-          tailscale ip -4
+          # Tailscale ka full path use kar rahe hain taake 'Not Recognized' error na aaye
+          $tsPath = "C:\Program Files\Tailscale\tailscale.exe"
+          & $tsPath up --authkey ${{ github.event.inputs.tailscale_auth_key }}
+          Start-Sleep -Seconds 15
+          & $tsPath ip -4
+          Write-Host "Tailscale Connected Successfully!" -ForegroundColor Green
 
-      - name: 4. Create Internal Watch-Bot (Desktop)
+      - name: 4. Create PRO Watch-Bot with Proxy Switcher
         shell: powershell
         run: |
           $botCode = @"
-          import os, time, pyautogui
-          def start_tabs():
+          import os, time, pyautogui, requests
+
+          def get_proxies():
+              try:
+                  r = requests.get('https://api.proxyscrape.com/v2/?request=displayproxies&protocol=http&timeout=10000&country=all&ssl=all&anonymity=all')
+                  return r.text.splitlines()
+              except: return []
+
+          def start_pro_watch():
+              proxies = get_proxies()
               chrome_path = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
-              for i in range(1, 31):
+              
+              for i in range(1, 26): # 25 High-Quality Tabs
                   profile = f"C:\\Users\\Public\\WatchProfile{i}"
-                  # Auto-Quality 144p and Mute
-                  cmd = f'start "" "{chrome_path}" --user-data-dir="{profile}" --mute-audio --disable-gpu --no-first-run "https://www.youtube.com"'
+                  proxy = proxies[i] if i < len(proxies) else ""
+                  
+                  # Chrome with Proxy and Ghost Mode
+                  cmd = f'start "" "{chrome_path}" --user-data-dir="{profile}" --proxy-server="{proxy}" --mute-audio --disable-gpu --no-first-run "https://www.youtube.com"'
                   os.system(cmd)
-                  time.sleep(3)
+                  print(f"Launched Tab {i} with Proxy: {proxy}")
+                  time.sleep(4)
+
           if __name__ == "__main__":
-              time.sleep(5)
-              start_tabs()
+              print("Bot starting in 10 seconds...")
+              time.sleep(10)
+              start_pro_watch()
               while True:
                   pyautogui.press('shift')
                   time.sleep(30)
           "@
-          $botCode | Out-File -FilePath "C:\Users\Public\Desktop\START_WATCHTIME.py" -Encoding ascii
+          $botCode | Out-File -FilePath "C:\Users\Public\Desktop\TITAN_PRO_BOT.py" -Encoding ascii
 
-      - name: 5. 9-Hour Session
+      - name: 5. 9-Hour Non-Stop Session
         run: Start-Sleep -Seconds 32400
