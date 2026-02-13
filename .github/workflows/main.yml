@@ -1,68 +1,64 @@
-name: TITAN-V219-ZERO-FAIL-WATCHTIME
+name: TITAN-V220-TAILSCALE-EDITION
 
 on:
   workflow_dispatch:
+    inputs:
+      tailscale_auth_key:
+        description: 'Apni Tailscale Auth Key yahan dalein'
+        required: true
 
 jobs:
   build:
     runs-on: windows-latest
     steps:
-      - name: 1. Setup User & Mobile Optimization
+      - name: 1. Setup User & Mobile View
         shell: powershell
         run: |
           $Password = ConvertTo-SecureString "Admin@Watch786" -AsPlainText -Force
           net user RDP Admin@Watch786 /add /expires:never 2>$null
           net localgroup Administrators RDP /add 2>$null
-          # Mobile Resolution Fix (800x600)
+          # Mobile Resolution (800x600)
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "DefaultDestinationHeight" -Value 600
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "DefaultDestinationWidth" -Value 800
           exit 0
 
-      - name: 2. Install Chrome & Cloudflared
+      - name: 2. Install Tailscale & Chrome
         shell: powershell
         run: |
-          choco install googlechrome cloudflared python -y --no-progress 2>$null
-          pip install pyautogui requests --quiet 2>$null
+          choco install googlechrome tailscale python -y --no-progress
+          pip install pyautogui requests --quiet
           exit 0
 
-      - name: 3. Create Custom Internal Watch-Bot
+      - name: 3. Connect to Tailscale
+        shell: powershell
+        run: |
+          # Tailscale ko login karne ki command
+          tailscale up --authkey ${{ github.event.inputs.tailscale_auth_key }}
+          Start-Sleep -Seconds 10
+          Write-Host "Tailscale Connected!" -ForegroundColor Green
+          tailscale ip -4
+
+      - name: 4. Create Internal Watch-Bot (Desktop)
         shell: powershell
         run: |
           $botCode = @"
           import os, time, pyautogui
-          # ISMEIN APNI VIDEO KA LINK RDP MEIN EDIT KAR KE DALEIN
           def start_tabs():
               chrome_path = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
-              for i in range(1, 31): # 30 Tabs for stability
+              for i in range(1, 31):
                   profile = f"C:\\Users\\Public\\WatchProfile{i}"
-                  # Ghost mode: No sound, no hardware load
+                  # Auto-Quality 144p and Mute
                   cmd = f'start "" "{chrome_path}" --user-data-dir="{profile}" --mute-audio --disable-gpu --no-first-run "https://www.youtube.com"'
                   os.system(cmd)
-                  print(f"Launched Profile {i}")
                   time.sleep(3)
           if __name__ == "__main__":
-              print("Starting Watch-Time Bot in 10 seconds...")
-              time.sleep(10)
+              time.sleep(5)
               start_tabs()
               while True:
                   pyautogui.press('shift')
                   time.sleep(30)
           "@
-          $botCode | Out-File -FilePath "C:\Users\Public\Desktop\CLICK_ME_FOR_WATCHTIME.py" -Encoding ascii
-          exit 0
+          $botCode | Out-File -FilePath "C:\Users\Public\Desktop\START_WATCHTIME.py" -Encoding ascii
 
-      - name: 4. Generate Direct Link (Mobile Access)
-        shell: powershell
-        run: |
-          Write-Host "--- GENERATING YOUR RDP LINK ---" -ForegroundColor Cyan
-          Start-Process cloudflared -ArgumentList "tunnel --url rdp://localhost:3389" -RedirectStandardOutput "C:\Users\Public\Desktop\address.log"
-          Start-Sleep -Seconds 45
-          $address = Get-Content "C:\Users\Public\Desktop\address.log" | Select-String "trycloudflare.com"
-          Write-Host "--------------------------------------------------"
-          Write-Host "RDP LINK: $address" -ForegroundColor Green
-          Write-Host "USER: RDP | PASS: Admin@Watch786" -ForegroundColor Yellow
-          Write-Host "--------------------------------------------------"
-          exit 0
-
-      - name: 5. Keep Alive (9 Hours)
+      - name: 5. 9-Hour Session
         run: Start-Sleep -Seconds 32400
