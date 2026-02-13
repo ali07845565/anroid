@@ -1,4 +1,4 @@
-name: TITAN-V221-FINAL-FIXED-TAILSCALE
+name: TITAN-V222-BAT-EDITION
 
 on:
   workflow_dispatch:
@@ -11,7 +11,7 @@ jobs:
   build:
     runs-on: windows-latest
     steps:
-      - name: 1. Setup User & Mobile Screen
+      - name: 1. Setup User & Mobile View
         shell: powershell
         run: |
           $Password = ConvertTo-SecureString "Admin@Watch786" -AsPlainText -Force
@@ -21,58 +21,42 @@ jobs:
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "DefaultDestinationWidth" -Value 800
           exit 0
 
-      - name: 2. Install Tools (Chrome, Tailscale, Python)
+      - name: 2. Install Tools (Full Path Fix)
         shell: powershell
         run: |
           choco install googlechrome tailscale python -y --no-progress
           pip install pyautogui requests --quiet
           exit 0
 
-      - name: 3. Connect Tailscale (Path Fix)
+      - name: 3. Connect Tailscale
         shell: powershell
         run: |
-          # Tailscale ka full path use kar rahe hain taake 'Not Recognized' error na aaye
           $tsPath = "C:\Program Files\Tailscale\tailscale.exe"
           & $tsPath up --authkey ${{ github.event.inputs.tailscale_auth_key }}
-          Start-Sleep -Seconds 15
-          & $tsPath ip -4
-          Write-Host "Tailscale Connected Successfully!" -ForegroundColor Green
+          Start-Sleep -Seconds 10
+          exit 0
 
-      - name: 4. Create PRO Watch-Bot with Proxy Switcher
+      - name: 4. Create BAT and Python Script
         shell: powershell
         run: |
-          $botCode = @"
-          import os, time, pyautogui, requests
-
-          def get_proxies():
-              try:
-                  r = requests.get('https://api.proxyscrape.com/v2/?request=displayproxies&protocol=http&timeout=10000&country=all&ssl=all&anonymity=all')
-                  return r.text.splitlines()
-              except: return []
-
-          def start_pro_watch():
-              proxies = get_proxies()
-              chrome_path = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
-              
-              for i in range(1, 26): # 25 High-Quality Tabs
-                  profile = f"C:\\Users\\Public\\WatchProfile{i}"
+          # Ye Python script background mein proxies handle karega
+          $pyCode = @"
+          import os, time, requests
+          def start():
+              proxies = requests.get('https://api.proxyscrape.com/v2/?request=displayproxies&protocol=http').text.splitlines()
+              chrome = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+              for i in range(1, 21):
                   proxy = proxies[i] if i < len(proxies) else ""
-                  
-                  # Chrome with Proxy and Ghost Mode
-                  cmd = f'start "" "{chrome_path}" --user-data-dir="{profile}" --proxy-server="{proxy}" --mute-audio --disable-gpu --no-first-run "https://www.youtube.com"'
-                  os.system(cmd)
-                  print(f"Launched Tab {i} with Proxy: {proxy}")
-                  time.sleep(4)
-
-          if __name__ == "__main__":
-              print("Bot starting in 10 seconds...")
-              time.sleep(10)
-              start_pro_watch()
-              while True:
-                  pyautogui.press('shift')
-                  time.sleep(30)
+                  os.system(f'start "" "{chrome}" --user-data-dir="C:\\Users\\Public\\P{i}" --proxy-server="{proxy}" --mute-audio --disable-gpu "https://www.youtube.com"')
+                  time.sleep(2)
+          if __name__ == "__main__": start()
           "@
-          $botCode | Out-File -FilePath "C:\Users\Public\Desktop\TITAN_PRO_BOT.py" -Encoding ascii
+          $pyCode | Out-File -FilePath "C:\Users\Public\watch_logic.py" -Encoding ascii
 
-      - name: 5. 9-Hour Non-Stop Session
+          # YE HAI AAPKI .BAT FILE JO DESKTOP PAR MILEGI
+          $batCode = "@echo off`ntitle TITAN WATCHTIME BOT`necho Starting 20 Tabs with Proxies...`npython C:\Users\Public\watch_logic.py`npause"
+          $batCode | Out-File -FilePath "C:\Users\Public\Desktop\START_WATCHTIME.bat" -Encoding ascii
+          exit 0
+
+      - name: 5. 9-Hour Session
         run: Start-Sleep -Seconds 32400
