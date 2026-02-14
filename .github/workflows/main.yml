@@ -1,62 +1,39 @@
-name: TITAN-V222-BAT-EDITION
-
-on:
-  workflow_dispatch:
-    inputs:
-      tailscale_auth_key:
-        description: 'Tailscale Auth Key Dalein'
-        required: true
+name: Stable-Tailscale-RDP
+on: workflow_dispatch
 
 jobs:
   build:
     runs-on: windows-latest
     steps:
-      - name: 1. Setup User & Mobile View
+      - name: Tailscale Install & Connect
         shell: powershell
         run: |
-          $Password = ConvertTo-SecureString "Admin@Watch786" -AsPlainText -Force
-          net user RDP Admin@Watch786 /add /expires:never 2>$null
-          net localgroup Administrators RDP /add 2>$null
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "DefaultDestinationHeight" -Value 600
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "DefaultDestinationWidth" -Value 800
-          exit 0
-
-      - name: 2. Install Tools (Full Path Fix)
+          # Tailscale install karna
+          iwr -useb https://pkgs.tailscale.com/stable/tailscale-setup-latest.exe -OutFile tailscale-setup.exe
+          start-process -FilePath .\tailscale-setup.exe -ArgumentList "/quiet", "/norestart" -Wait
+          
+          # Tailscale connect karna (Apni AUTH KEY yahan dalen)
+          & "C:\Program Files\Tailscale\tailscale.exe" up --authkey=YOUR_TAILSCALE_AUTH_KEY
+          
+      - name: Optimize Windows for Performance
         shell: powershell
         run: |
-          choco install googlechrome tailscale python -y --no-progress
-          pip install pyautogui requests --quiet
-          exit 0
+          # Connection stability ke liye Firewall aur Sleep settings fix karna
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -Value 0
+          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -Value 1
+          # Screen timeout aur power saving off karna taake connection na toote
+          powercfg /x -hibernate-timeout-ac 0
+          powercfg /x -idle-timeout-ac 0
 
-      - name: 3. Connect Tailscale
+      - name: Keep RDP Alive (Loop)
         shell: powershell
         run: |
-          $tsPath = "C:\Program Files\Tailscale\tailscale.exe"
-          & $tsPath up --authkey ${{ github.event.inputs.tailscale_auth_key }}
-          Start-Sleep -Seconds 10
-          exit 0
-
-      - name: 4. Create BAT and Python Script
-        shell: powershell
-        run: |
-          # Ye Python script background mein proxies handle karega
-          $pyCode = @"
-          import os, time, requests
-          def start():
-              proxies = requests.get('https://api.proxyscrape.com/v2/?request=displayproxies&protocol=http').text.splitlines()
-              chrome = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
-              for i in range(1, 21):
-                  proxy = proxies[i] if i < len(proxies) else ""
-                  os.system(f'start "" "{chrome}" --user-data-dir="C:\\Users\\Public\\P{i}" --proxy-server="{proxy}" --mute-audio --disable-gpu "https://www.youtube.com"')
-                  time.sleep(2)
-          if __name__ == "__main__": start()
-          "@
-          $pyCode | Out-File -FilePath "C:\Users\Public\watch_logic.py" -Encoding ascii
-
-          # YE HAI AAPKI .BAT FILE JO DESKTOP PAR MILEGI
-          $batCode = "@echo off`ntitle TITAN WATCHTIME BOT`necho Starting 20 Tabs with Proxies...`npython C:\Users\Public\watch_logic.py`npause"
-          $batCode | Out-File -FilePath "C:\Users\Public\Desktop\START_WATCHTIME.bat" -Encoding ascii
-          exit 0
-
-      - name: 5. 9-Hour Session
-        run: Start-Sleep -Seconds 32400
+          $limit = 360 # 6 ghante ka limit
+          for ($i = 1; $i -le $limit; $i++) {
+              $time = Get-Date -Format "HH:mm:ss"
+              Write-Host "[$time] RDP is Active and Stable... (Minute $i)"
+              # CPU ko thora active rakhna taake GitHub idle samajh kar band na kare
+              Add-Content -Path "alive.txt" -Value "Running"
+              Start-Sleep -Seconds 60
+          }
