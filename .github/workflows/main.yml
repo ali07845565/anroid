@@ -26,15 +26,12 @@ jobs:
         shell: powershell
         run: |
           Write-Host "Optimizing Windows RDP Settings..."
+          # RDP enable karna
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -Value 0
           Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
           
-          # Naya Strong Password: RDP@Secure#123
-          $Password = ConvertTo-SecureString "RDP@Secure#123" -AsPlainText -Force
-          
-          # Password change karne ka safe tareeka
-          $User = Get-LocalUser -Name "runneradmin"
-          $User | Set-LocalPassword -Password $Password
+          # Sabse reliable method password change karne ka
+          net user runneradmin "RDP@Secure#123"
           
           Write-Host "Credentials Set -> User: runneradmin | Pass: RDP@Secure#123"
 
