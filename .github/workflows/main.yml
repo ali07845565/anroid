@@ -8,40 +8,40 @@ jobs:
       - name: Tailscale Install
         shell: powershell
         run: |
-          Write-Host "📥 Tailscale download ho raha hai..."
+          Write-Host "Downloading Tailscale..."
           iwr -useb https://pkgs.tailscale.com/stable/tailscale-setup-latest.exe -OutFile tailscale-setup.exe
-          Write-Host "⚙️ Installation shuru hai..."
+          Write-Host "Installing Tailscale..."
           start-process -FilePath .\tailscale-setup.exe -ArgumentList "/quiet", "/norestart" -Wait
-          Write-Host "✅ Tailscale Install ho gaya."
+          Write-Host "Tailscale Installation Completed."
 
-      - name: Tailscale Connect (Using Your Key)
+      - name: Tailscale Connect
         shell: powershell
         run: |
-          Write-Host "📡 Tailscale Network se connect ho raha hai..."
-          # Aapki key yahan use ho rahi hai
+          Write-Host "Connecting to Tailscale Network..."
+          # Using the key you provided
           & "C:\Program Files\Tailscale\tailscale.exe" up --authkey=tskey-auth-kF29Zucb5721CNTRL-Hjf7uGto6FLiKjgmKve3FLiKeMfUjnku --accept-dns=false --hostname=GitHub-RDP
-          Write-Host "✅ Connection Successful!"
+          Write-Host "Connection Successful!"
 
-      - name: Enable Remote Desktop & Fix Connection
+      - name: Enable Remote Desktop
         shell: powershell
         run: |
-          Write-Host "🛠️ Windows settings optimize ho rahi hain..."
-          # RDP allow karna
+          Write-Host "Optimizing Windows RDP Settings..."
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -Value 0
           Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
-          # Password set karna (User: runneradmin | Pass: RDP123456)
+          
+          # User: runneradmin | Password: RDP123456
           $Password = ConvertTo-SecureString "RDP123456" -AsPlainText -Force
           Set-LocalUser -Name "runneradmin" -Password $Password
-          Write-Host "✅ User: runneradmin | Password: RDP123456"
+          Write-Host "Credentials Set -> User: runneradmin | Pass: RDP123456"
 
-      - name: Keep RDP Alive (No Disconnect)
+      - name: Keep RDP Alive
         shell: powershell
         run: |
-          Write-Host "🔥 RDP Active hai. Ab Tailscale Dashboard mein 'GitHub-RDP' ka IP check karen."
+          Write-Host "RDP is now active. Check your Tailscale Dashboard for 'GitHub-RDP' IP."
           $i = 0
           while($i -lt 360) {
             $time = Get-Date -Format "HH:mm:ss"
-            Write-Host "[$time] Status: Online & Stable..."
+            Write-Host "[$time] Status: Online"
             Start-Sleep -Seconds 60
             $i++
           }
