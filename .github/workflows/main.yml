@@ -1,39 +1,47 @@
-name: Stable-Tailscale-RDP
+name: Stable-Tailscale-RDP-Fixed
 on: workflow_dispatch
 
 jobs:
   build:
     runs-on: windows-latest
     steps:
-      - name: Tailscale Install & Connect
+      - name: Tailscale Install
         shell: powershell
         run: |
-          # Tailscale install karna
+          Write-Host "📥 Tailscale download ho raha hai..."
           iwr -useb https://pkgs.tailscale.com/stable/tailscale-setup-latest.exe -OutFile tailscale-setup.exe
+          Write-Host "⚙️ Installation shuru hai..."
           start-process -FilePath .\tailscale-setup.exe -ArgumentList "/quiet", "/norestart" -Wait
-          
-          # Tailscale connect karna (Apni AUTH KEY yahan dalen)
-          & "C:\Program Files\Tailscale\tailscale.exe" up --authkey=YOUR_TAILSCALE_AUTH_KEY
-          
-      - name: Optimize Windows for Performance
+          Write-Host "✅ Tailscale Install ho gaya."
+
+      - name: Tailscale Connect (Using Your Key)
         shell: powershell
         run: |
-          # Connection stability ke liye Firewall aur Sleep settings fix karna
+          Write-Host "📡 Tailscale Network se connect ho raha hai..."
+          # Aapki key yahan use ho rahi hai
+          & "C:\Program Files\Tailscale\tailscale.exe" up --authkey=tskey-auth-kF29Zucb5721CNTRL-Hjf7uGto6FLiKjgmKve3FLiKeMfUjnku --accept-dns=false --hostname=GitHub-RDP
+          Write-Host "✅ Connection Successful!"
+
+      - name: Enable Remote Desktop & Fix Connection
+        shell: powershell
+        run: |
+          Write-Host "🛠️ Windows settings optimize ho rahi hain..."
+          # RDP allow karna
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -Value 0
           Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -Value 1
-          # Screen timeout aur power saving off karna taake connection na toote
-          powercfg /x -hibernate-timeout-ac 0
-          powercfg /x -idle-timeout-ac 0
+          # Password set karna (User: runneradmin | Pass: RDP123456)
+          $Password = ConvertTo-SecureString "RDP123456" -AsPlainText -Force
+          Set-LocalUser -Name "runneradmin" -Password $Password
+          Write-Host "✅ User: runneradmin | Password: RDP123456"
 
-      - name: Keep RDP Alive (Loop)
+      - name: Keep RDP Alive (No Disconnect)
         shell: powershell
         run: |
-          $limit = 360 # 6 ghante ka limit
-          for ($i = 1; $i -le $limit; $i++) {
-              $time = Get-Date -Format "HH:mm:ss"
-              Write-Host "[$time] RDP is Active and Stable... (Minute $i)"
-              # CPU ko thora active rakhna taake GitHub idle samajh kar band na kare
-              Add-Content -Path "alive.txt" -Value "Running"
-              Start-Sleep -Seconds 60
+          Write-Host "🔥 RDP Active hai. Ab Tailscale Dashboard mein 'GitHub-RDP' ka IP check karen."
+          $i = 0
+          while($i -lt 360) {
+            $time = Get-Date -Format "HH:mm:ss"
+            Write-Host "[$time] Status: Online & Stable..."
+            Start-Sleep -Seconds 60
+            $i++
           }
