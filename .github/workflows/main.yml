@@ -1,4 +1,4 @@
-name: Stable-Tailscale-RDP-Fixed
+name: Stable-Tailscale-RDP-Final
 on: workflow_dispatch
 
 jobs:
@@ -18,21 +18,25 @@ jobs:
         shell: powershell
         run: |
           Write-Host "Connecting to Tailscale Network..."
-          # Using the key you provided
+          # Aapki Auth Key yahan use ho rahi hai
           & "C:\Program Files\Tailscale\tailscale.exe" up --authkey=tskey-auth-kF29Zucb5721CNTRL-Hjf7uGto6FLiKjgmKve3FLiKeMfUjnku --accept-dns=false --hostname=GitHub-RDP
           Write-Host "Connection Successful!"
 
-      - name: Enable Remote Desktop
+      - name: Enable Remote Desktop & Fix Password
         shell: powershell
         run: |
           Write-Host "Optimizing Windows RDP Settings..."
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -Value 0
           Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
           
-          # User: runneradmin | Password: RDP123456
-          $Password = ConvertTo-SecureString "RDP123456" -AsPlainText -Force
-          Set-LocalUser -Name "runneradmin" -Password $Password
-          Write-Host "Credentials Set -> User: runneradmin | Pass: RDP123456"
+          # Naya Strong Password: RDP@Secure#123
+          $Password = ConvertTo-SecureString "RDP@Secure#123" -AsPlainText -Force
+          
+          # Password change karne ka safe tareeka
+          $User = Get-LocalUser -Name "runneradmin"
+          $User | Set-LocalPassword -Password $Password
+          
+          Write-Host "Credentials Set -> User: runneradmin | Pass: RDP@Secure#123"
 
       - name: Keep RDP Alive
         shell: powershell
@@ -41,7 +45,7 @@ jobs:
           $i = 0
           while($i -lt 360) {
             $time = Get-Date -Format "HH:mm:ss"
-            Write-Host "[$time] Status: Online"
+            Write-Host "[$time] Status: Online and Connected"
             Start-Sleep -Seconds 60
             $i++
           }
